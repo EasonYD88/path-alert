@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Alert } from '@prisma/client'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -14,7 +13,7 @@ export async function GET(request: Request) {
     where.severity = severity
   }
 
-  const alerts: Alert[] = await prisma.alert.findMany({
+  const alerts = await prisma.alert.findMany({
     where,
     orderBy: { publishedAt: 'desc' },
     take: limit
@@ -23,7 +22,7 @@ export async function GET(request: Request) {
   // Filter by line if specified
   let filteredAlerts = alerts
   if (line) {
-    filteredAlerts = alerts.filter((alert: Alert) => {
+    filteredAlerts = alerts.filter((alert) => {
       const lines = JSON.parse(alert.affectedLines) as string[]
       return lines.includes(line)
     })
