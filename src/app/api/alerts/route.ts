@@ -1,5 +1,32 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+
+// Demo alerts for now (database setup needed for production)
+const DEMO_ALERTS = [
+  {
+    id: '1',
+    source: 'panynj',
+    originalText: 'At JSQ, the Kiss&Ride elevator from street to concourse out of service until further notice. Please use the ramp.',
+    alertType: 'closure',
+    severity: 'warning',
+    affectedLines: '[]',
+    affectedStations: '["Journal Square"]',
+    publishedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    notified: false
+  },
+  {
+    id: '2',
+    source: 'panynj',
+    originalText: 'PATH service suspended between Newark and World Trade Center due to signal problems. Expect 20-30 minute delays.',
+    alertType: 'suspension',
+    severity: 'critical',
+    affectedLines: '["WTC"]',
+    affectedStations: '["Newark", "World Trade Center"]',
+    publishedAt: new Date(Date.now() - 3600000).toISOString(),
+    createdAt: new Date().toISOString(),
+    notified: false
+  }
+]
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -7,26 +34,18 @@ export async function GET(request: Request) {
   const severity = searchParams.get('severity')
   const line = searchParams.get('line')
 
-  const where: Record<string, unknown> = {}
+  let filteredAlerts = DEMO_ALERTS
   
   if (severity) {
-    where.severity = severity
+    filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity)
   }
 
-  const alerts = await prisma.alert.findMany({
-    where,
-    orderBy: { publishedAt: 'desc' },
-    take: limit
-  })
-
-  // Filter by line if specified
-  let filteredAlerts = alerts
   if (line) {
-    filteredAlerts = alerts.filter((alert: typeof alerts[number]) => {
+    filteredAlerts = filteredAlerts.filter(alert => {
       const lines = JSON.parse(alert.affectedLines) as string[]
       return lines.includes(line)
     })
   }
 
-  return NextResponse.json(filteredAlerts)
+  return NextResponse.json(filteredAlerts.slice(0, limit))
 }
