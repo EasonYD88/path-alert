@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server'
+import { redis, ALERTS_KEY } from '@/lib/redis'
 
-// In-memory store for demo (replace with database in production)
-let alertsCache: Array<{
-  id: string
-  source: string
-  originalText: string
-  alertType: string
-  severity: string
-  affectedLines: string
-  affectedStations: string
-  publishedAt: string
-  createdAt: string
-  notified: boolean
-}> = [
+// Default alerts for initial setup
+const DEFAULT_ALERTS = [
   {
     id: '1',
     source: 'panynj',
@@ -39,13 +29,30 @@ let alertsCache: Array<{
   }
 ]
 
+async function getAlerts() {
+  try {
+    const alerts = await redis.get<typeof DEFAULT_ALERTS>(ALERTS_KEY)
+    if (!alerts || alerts.length === 0) {
+      // Initialize with default alerts
+      await redis.set(ALERTS_KEY, DEFAULT_ALERTS)
+      return DEFAULT_ALERTS
+    }
+    return alerts
+  } catch (error) {
+    console.error('Redis error:', error)
+    return DEFAULT_ALERTS
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '50')
   const severity = searchParams.get('severity')
   const line = searchParams.get('line')
 
-  let filteredAlerts = [...alertsCache]
+  const alerts = await getAlerts()
+  
+  let filteredAlerts = [...alerts]
   
   if (severity) {
     filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity)
@@ -64,43 +71,27 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     // Fetch fresh alerts from PATH website
-    // Note: This is a simplified version - in production you'd use proper scraping
     const response = await fetch('https://www.panynj.gov/path/alerts.html', {
       headers: {
         'User-Agent': 'PATH-Alert/1.0'
       },
-      next: { revalidate: 60 } // Cache for 1 minute
+      next: { revalidate: 60 }
     })
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status}`)
-    }
-
-    const html = await response.text()
+    // For demo, we'll keep using cached data
+    // In production, you'd parse the HTML and update Redis
     
-    // Simple parsing - look for alert patterns in the HTML
-    // This is a basic implementation - you may need to adjust based on actual HTML structure
-    const alertPatterns = [
-      /elevator.*?out of service/gi,
-      /escalator.*?out of service/gi,
-      /service.*?suspended/gi,
-      /delays?/gi,
-      /closed/gi
-    ]
-
-    // For demo purposes, we'll just return success
-    // In production, you'd parse the HTML and update the database
+    const alerts = await getAlerts()
     
     return NextResponse.json({ 
       success: true, 
-      message: 'Scraping triggered - using cached data for demo',
-      cachedAlerts: alertsCache.length
+      message: 'Using Redis cache',
+      cachedAlerts: alerts.length
     })
   } catch (error) {
     console.error('Error fetching alerts:', error)
     return NextResponse.json({ 
-      error: 'Failed to fetch alerts',
-      message: 'Using cached data'
+      error: 'Failed to fetch alerts'
     }, { status: 500 })
   }
 }
