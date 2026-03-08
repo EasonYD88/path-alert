@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Alert {
+  id            String   @id @default(cuid())
+  source        String   @default("twitter")
+  originalText  String
+  alertType     String   @default("other")
+  severity      String   @default("info")
+  affectedLines String   @default("[]")
+  affectedStations String @default("[]")
+  publishedAt   DateTime
+  createdAt     DateTime @default(now())
+  notified      Boolean  @default(false)
+
+  @@index([publishedAt])
+  @@index([severity])
+  @@index([notified])
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  keys      String
+  lines     String   @default("[]")
+  stations  String   @default("[]")
+  createdAt DateTime @default(now())
+}
