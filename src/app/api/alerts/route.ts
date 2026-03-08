@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   // Filter by line if specified
   let filteredAlerts = alerts
   if (line) {
-    filteredAlerts = alerts.filter((alert) => {
+    filteredAlerts = alerts.filter((alert: typeof alerts[number]) => {
       const lines = JSON.parse(alert.affectedLines) as string[]
       return lines.includes(line)
     })
