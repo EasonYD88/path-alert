@@ -1,7 +1,18 @@
 import { NextResponse } from 'next/server'
 
-// Demo alerts for now (database setup needed for production)
-const DEMO_ALERTS = [
+// In-memory store for demo (replace with database in production)
+let alertsCache: Array<{
+  id: string
+  source: string
+  originalText: string
+  alertType: string
+  severity: string
+  affectedLines: string
+  affectedStations: string
+  publishedAt: string
+  createdAt: string
+  notified: boolean
+}> = [
   {
     id: '1',
     source: 'panynj',
@@ -34,7 +45,7 @@ export async function GET(request: Request) {
   const severity = searchParams.get('severity')
   const line = searchParams.get('line')
 
-  let filteredAlerts = DEMO_ALERTS
+  let filteredAlerts = [...alertsCache]
   
   if (severity) {
     filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity)
@@ -48,4 +59,48 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json(filteredAlerts.slice(0, limit))
+}
+
+export async function POST(request: Request) {
+  try {
+    // Fetch fresh alerts from PATH website
+    // Note: This is a simplified version - in production you'd use proper scraping
+    const response = await fetch('https://www.panynj.gov/path/alerts.html', {
+      headers: {
+        'User-Agent': 'PATH-Alert/1.0'
+      },
+      next: { revalidate: 60 } // Cache for 1 minute
+    })
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.status}`)
+    }
+
+    const html = await response.text()
+    
+    // Simple parsing - look for alert patterns in the HTML
+    // This is a basic implementation - you may need to adjust based on actual HTML structure
+    const alertPatterns = [
+      /elevator.*?out of service/gi,
+      /escalator.*?out of service/gi,
+      /service.*?suspended/gi,
+      /delays?/gi,
+      /closed/gi
+    ]
+
+    // For demo purposes, we'll just return success
+    // In production, you'd parse the HTML and update the database
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Scraping triggered - using cached data for demo',
+      cachedAlerts: alertsCache.length
+    })
+  } catch (error) {
+    console.error('Error fetching alerts:', error)
+    return NextResponse.json({ 
+      error: 'Failed to fetch alerts',
+      message: 'Using cached data'
+    }, { status: 500 })
+  }
 }

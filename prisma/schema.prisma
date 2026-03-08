@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Alert {
   id            String   @id @default(cuid())
-  source        String   @default("twitter")
+  source        String   @default("panynj")
   originalText  String
   alertType     String   @default("other")
   severity      String   @default("info")
