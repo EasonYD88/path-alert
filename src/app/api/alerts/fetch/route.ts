@@ -2,58 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseAlert } from '@/lib/alert-parser'
 
-// Nitter instances to try
-const NITTER_INSTANCES = [
-  'nitter.net',
-  'nitter.privacydev.net',
-  'nitter.poast.org'
-]
-
-async function fetchFromNitter(username: string): Promise<string[]> {
-  const tweets: string[] = []
-  
-  for (const instance of NITTER_INSTANCES) {
-    try {
-      const response = await fetch(`https://${instance}/${username}/rss`, {
-        headers: {
-          'User-Agent': 'PATH-Alert/1.0'
-        },
-        next: { revalidate: 300 } // Cache for 5 minutes
-      })
-      
-      if (response.ok) {
-        const text = await response.text()
-        // Extract tweet content from RSS
-        const matches = text.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/g)
-        if (matches) {
-          for (const match of matches) {
-            const content = match.replace(/<!\[\CDATA\[|\]\]>|<\/description>/g, '')
-            // Clean HTML entities and tags
-            const cleanContent = content
-              .replace(/<[^>]*>/g, '')
-              .replace(/&amp;/g, '&')
-              .replace(/&lt;/g, '<')
-              .replace(/&gt;/g, '>')
-              .replace(/&quot;/g, '"')
-              .trim()
-            if (cleanContent && !cleanContent.includes('RSS')) {
-              tweets.push(cleanContent)
-            }
-          }
-        }
-        break // Success, no need to try other instances
-      }
-    } catch (error) {
-      console.log(`Failed to fetch from ${instance}:`, error)
-      continue
-    }
-  }
-  
-  return tweets
-}
-
 export async function POST(request: Request) {
-  // In production, this should be protected by a secret key
   const authHeader = request.headers.get('authorization')
   const secret = process.env.CRON_SECRET
   
@@ -62,28 +11,49 @@ export async function POST(request: Request) {
   }
 
   try {
-    const tweets = await fetchFromNitter('PATHTrain')
+    // Fetch from PATH official website
+    const response = await fetch('https://www.panynj.gov/path/en/alerts.html', {
+      headers: {
+        'User-Agent': 'PATH-Alert/1.0'
+      },
+      next: { revalidate: 300 }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.status}`)
+    }
+    
+    const html = await response.text()
+    
+    // Extract alert content from the page
+    // Looking for the pattern: "Today at HH:MMam/pm HH:MM AM/PM: Alert text"
+    const alertMatches = html.match(/((?:Today|Yesterday|This week) at \d{1,2}:\d{2}[ap]m[\s\S]*?(?=Today at|Yesterday at|This week at|$))/gi) || []
     
     let newAlertsCount = 0
     
-    for (const tweet of tweets) {
-      // Check if we already have this exact tweet
+    for (const alertText of alertMatches) {
+      // Clean up the alert text
+      const cleanedText = alertText.trim().replace(/\s+/g, ' ')
+      
+      if (cleanedText.length < 20) continue // Skip too short matches
+      
+      // Check if we already have this exact alert
       const existing = await prisma.alert.findFirst({
-        where: { originalText: tweet }
+        where: { originalText: { contains: cleanedText.substring(0, 50) } }
       })
       
       if (!existing) {
-        const parsed = parseAlert(tweet)
+        const parsed = parseAlert(cleanedText)
         
         await prisma.alert.create({
           data: {
-            source: 'twitter',
-            originalText: parsed.originalText,
+            source: 'panynj',
+            originalText: cleanedText,
             alertType: parsed.alertType,
             severity: parsed.severity,
             affectedLines: JSON.stringify(parsed.affectedLines),
             affectedStations: JSON.stringify(parsed.affectedStations),
-            publishedAt: parsed.publishedAt,
+            publishedAt: new Date(),
             notified: false
           }
         })
@@ -94,7 +64,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      tweetsProcessed: tweets.length,
+      alertsFound: alertMatches.length,
       newAlerts: newAlertsCount 
     })
   } catch (error) {
