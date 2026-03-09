@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server'
 import { redis, ALERTS_KEY } from '@/lib/redis'
 
+// Source URLs for different sources
+const SOURCE_URLS: Record<string, string> = {
+  panynj: 'https://www.panynj.gov/path/alerts.html',
+  twitter: 'https://twitter.com/PATHTrain'
+}
+
 // Default alerts for initial setup
 const DEFAULT_ALERTS = [
   {
     id: '1',
     source: 'panynj',
+    sourceUrl: 'https://www.panynj.gov/path/alerts.html',
     originalText: 'At JSQ, the Kiss&Ride elevator from street to concourse out of service until further notice. Please use the ramp.',
     alertType: 'closure',
     severity: 'warning',
@@ -18,6 +25,7 @@ const DEFAULT_ALERTS = [
   {
     id: '2',
     source: 'panynj',
+    sourceUrl: 'https://www.panynj.gov/path/alerts.html',
     originalText: 'PATH service suspended between Newark and World Trade Center due to signal problems. Expect 20-30 minute delays.',
     alertType: 'suspension',
     severity: 'critical',
@@ -48,7 +56,6 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const limit = parseInt(searchParams.get('limit') || '50')
   const severity = searchParams.get('severity')
-  const line = searchParams.get('line')
 
   const alerts = await getAlerts()
   
@@ -56,13 +63,6 @@ export async function GET(request: Request) {
   
   if (severity) {
     filteredAlerts = filteredAlerts.filter(alert => alert.severity === severity)
-  }
-
-  if (line) {
-    filteredAlerts = filteredAlerts.filter(alert => {
-      const lines = JSON.parse(alert.affectedLines) as string[]
-      return lines.includes(line)
-    })
   }
 
   return NextResponse.json(filteredAlerts.slice(0, limit))
