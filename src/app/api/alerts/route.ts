@@ -3,7 +3,7 @@ import { redis, ALERTS_KEY } from '@/lib/redis'
 
 // Source URLs for different sources
 const SOURCE_URLS: Record<string, string> = {
-  panynj: 'https://www.panynj.gov/path/alerts.html',
+  panynj: 'https://www.panynj.gov/path',
   twitter: 'https://twitter.com/PATHTrain'
 }
 
@@ -12,7 +12,7 @@ const DEFAULT_ALERTS = [
   {
     id: '1',
     source: 'panynj',
-    sourceUrl: 'https://www.panynj.gov/path/alerts.html',
+    sourceUrl: 'https://www.panynj.gov/path',
     originalText: 'At JSQ, the Kiss&Ride elevator from street to concourse out of service until further notice. Please use the ramp.',
     alertType: 'closure',
     severity: 'warning',
@@ -25,7 +25,7 @@ const DEFAULT_ALERTS = [
   {
     id: '2',
     source: 'panynj',
-    sourceUrl: 'https://www.panynj.gov/path/alerts.html',
+    sourceUrl: 'https://www.panynj.gov/path',
     originalText: 'PATH service suspended between Newark and World Trade Center due to signal problems. Expect 20-30 minute delays.',
     alertType: 'suspension',
     severity: 'critical',
